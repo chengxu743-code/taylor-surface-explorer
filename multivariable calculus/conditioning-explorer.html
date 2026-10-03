@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Why m/L changes optimization difficulty</title>
+  <style>
+    :root { color-scheme: light dark; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; --bg: light-dark(#f7f9fc,#101723); --panel: light-dark(#fff,#182333); --text: light-dark(#172033,#eaf0f8); --muted: light-dark(#536174,#a9b7c9); --line: light-dark(#d9e1eb,#354258); --blue: light-dark(#1b69c9,#75adff); --orange: light-dark(#d56722,#ffa668); --purple: light-dark(#7856b2,#b59aff); --soft-blue: light-dark(#eaf3ff,#213954); }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); }
+    main { max-width: 1120px; margin: auto; padding: 28px 20px 40px; }
+    h1 { margin: 0 0 8px; font-size: clamp(1.6rem,3vw,2.25rem); line-height: 1.18; }
+    h2 { font-size: 1.05rem; margin: 0 0 8px; }
+    p { line-height: 1.55; }
+    .intro { color: var(--muted); margin: 0 0 20px; max-width: 72ch; }
+    .formula { font-family: ui-serif, Georgia, serif; color: var(--text); font-size: 1.12rem; }
+    .controls, .panel, .takeaway { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+    .controls { padding: 18px; margin-bottom: 18px; }
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+    button { font: inherit; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 9px 13px; min-height: 40px; cursor: pointer; }
+    button[aria-pressed="true"] { background: var(--soft-blue); border-color: var(--blue); color: var(--blue); }
+    button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+    .sliders { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; }
+    .slider label { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; }
+    .slider output { font-variant-numeric: tabular-nums; color: var(--blue); }
+    input[type="range"] { width: 100%; margin: 12px 0 4px; accent-color: var(--blue); }
+    .slider small { display: block; color: var(--muted); line-height: 1.35; }
+    .numbers { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 0; }
+    .number { border: 1px solid var(--line); border-radius: 8px; padding: 8px 12px; font-variant-numeric: tabular-nums; }
+    .number strong { color: var(--blue); }
+    .plots { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 18px; }
+    .panel { padding: 16px 18px; min-width: 0; }
+    .panel p { color: var(--muted); margin: 0 0 6px; font-size: .91rem; }
+    svg { width: 100%; height: auto; display: block; overflow: visible; }
+    svg text { fill: var(--muted); font: 12px ui-sans-serif, system-ui, sans-serif; }
+    .grid { stroke: var(--line); stroke-width: 1; }
+    .contour { stroke: var(--blue); opacity: .48; stroke-width: 1.5; fill: none; }
+    .path { stroke: var(--orange); stroke-width: 3; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+    .curve { stroke: var(--blue); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .curve-flat { stroke: var(--purple); stroke-width: 3; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+    .dot { fill: var(--orange); stroke: var(--panel); stroke-width: 2; }
+    .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); }
+    .swatch { display: inline-block; width: 15px; height: 3px; vertical-align: middle; margin-right: 5px; background: var(--blue); }
+    .swatch.orange { background: var(--orange); }
+    .swatch.purple { background: var(--purple); }
+    .progress-panel { margin-top: 18px; }
+    .progress-panel svg { max-height: 310px; }
+    .step-row { display: grid; grid-template-columns: 125px minmax(0,1fr) 62px; align-items: center; gap: 10px; margin: 9px 0; font-size: .9rem; font-variant-numeric: tabular-nums; }
+    .step-track { height: 12px; background: var(--bg); border-radius: 999px; overflow: hidden; }
+    .step-fill { display: block; height: 100%; background: var(--blue); border-radius: inherit; }
+    .step-fill.flat { background: var(--purple); }
+    .takeaway { margin-top: 18px; padding: 16px 18px; border-left: 4px solid var(--orange); }
+    .takeaway p { margin: 0; }
+    .explain { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+    .explain p { margin: 0; color: var(--muted); }
+    @media (max-width: 720px) { .sliders, .plots, .explain { grid-template-columns: 1fr; } main { padding: 20px 12px 28px; } }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Why does <i>m/L</i> change the difficulty of optimization?</h1>
+  <p class="intro">Explore <span class="formula">f(x,y) = ½(Lx² + my²)</span>. <b>L</b> bends the bowl in the x direction; <b>m</b> bends it in the y direction. The minimum is always (0, 0). Compare the presets, then change each slider separately.</p>
+  <section class="controls" aria-label="Explore curvature and iterations">
+    <div class="presets" aria-label="Examples">
+      <button type="button" data-L="4" data-m="4" aria-pressed="false">Round · L=4, m=4</button>
+      <button type="button" data-L="4" data-m="0.4" aria-pressed="true">Valley · L=4, m=0.4</button>
+      <button type="button" data-L="4" data-m="0.04" aria-pressed="false">Narrow valley · L=4, m=0.04</button>
+      <button type="button" data-L="8" data-m="0.8" aria-pressed="false">Taller, same ratio · L=8, m=0.8</button>
+    </div>
+    <div class="sliders">
+      <div class="slider"><label for="L">Steep curvature L <output id="L-value">4.00</output></label><input id="L" type="range" min="0.5" max="10" step="0.05" value="4"><small>L sets the steepest slope and the safe step size.</small></div>
+      <div class="slider"><label for="m">Flat curvature m <output id="m-value">0.400</output></label><input id="m" type="range" min="-3" max="0.60206" step="any" value="-0.39794"><small>Logarithmic slider: drag left to flatten the valley. Always m ≤ L.</small></div>
+      <div class="slider"><label for="steps">Gradient steps <output id="steps-value">10</output></label><input id="steps" type="range" min="0" max="100" step="1" value="10"><small>Slide to see how quickly the point reaches the minimum.</small></div>
+    </div>
+    <div class="numbers" aria-live="polite"><div class="number">Ratio m/L = <strong id="ratio">0.100</strong></div><div class="number">Condition number L/m = <strong id="kappa">10.0</strong></div><div class="number">Step size 1/L = <strong id="eta">0.250</strong></div></div>
+  </section>
+  <div class="plots">
+    <section class="panel"><h2>1. See the bowl from above</h2><p>Blue lines mark the same fixed heights in every setting. Orange traces gradient descent from (2, 2).</p><svg id="contours" viewBox="0 0 420 420" role="img" aria-label="Contour plot and gradient descent path"></svg><div class="legend"><span><i class="swatch"></i>fixed-height contours</span><span><i class="swatch orange"></i>descent path</span></div></section>
+    <section class="panel"><h2>2. Compare the two bends</h2><p>Cut the bowl along x and y. Both curves use the same height scale, so changes in L and m are visible directly.</p><svg id="slices" viewBox="0 0 420 420" role="img" aria-label="Cross sections of the bowl in the steep and flat directions"></svg><div class="legend"><span><i class="swatch"></i>x direction · L</span><span><i class="swatch purple"></i>y direction · m</span></div></section>
+  </div>
+  <section class="panel progress-panel"><h2>3. Why is a narrow valley slower?</h2><p>Gradient descent uses a step size of 1/L. From the same distance, it moves the following fraction toward the minimum in one step:</p>
+    <div class="step-row"><span>x direction</span><span class="step-track"><span class="step-fill" style="width:100%"></span></span><strong>100%</strong></div>
+    <div class="step-row"><span>y direction</span><span class="step-track"><span id="flat-fill" class="step-fill flat" style="width:10%"></span></span><strong id="flat-percent">10%</strong></div>
+    <p>Remaining distance in the flat direction as steps pass:</p><svg id="progress" viewBox="0 0 840 260" role="img" aria-label="Remaining distance over 100 gradient descent steps"></svg>
+  </section>
+  <section class="takeaway" aria-live="polite"><p id="takeaway"></p></section>
+  <div class="explain"><section><h2>Why the ratio matters</h2><p>The steep side sets the scale of a safe step; here we choose 1/L. The flat side offers a gradient of only m times the distance. Each step removes m/L of the flat-direction distance, so a small ratio takes many steps.</p></section><section><h2>Try “Taller, same ratio”</h2><p>Both curvatures double: the cross-section curves rise and the fixed-height contours shrink. But m/L stays 0.1, so gradient descent makes the same relative progress when its step size is adjusted to 1/L. This is expected.</p></section></div>
+</main>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const Linput = $('L'), minput = $('m'), stepsInput = $('steps');
+  const NS = 'http://www.w3.org/2000/svg';
+  const svgEl = (tag, attrs = {}, parent) => { const e = document.createElementNS(NS,tag); for (const [k,v] of Object.entries(attrs)) e.setAttribute(k,v); parent.appendChild(e); return e; };
+  const label = (parent,x,y,value,extra={}) => {const e=svgEl('text',{x,y,...extra},parent);e.textContent=value;return e;};
+  const fmt = (n,d=2) => Number(n).toFixed(d);
+  const pretty = n => n >= 1 ? fmt(n,2) : n >= .1 ? fmt(n,3) : n >= .01 ? fmt(n,4) : Number(n).toPrecision(3);
+  function drawContours(L,m,n) {
+    const svg=$('contours'); svg.replaceChildren();
+    const defs=svgEl('defs',{},svg),clip=svgEl('clipPath',{id:'contour-clip'},defs);svgEl('rect',{x:49,y:24,width:340,height:340},clip);
+    const x=v=>219+v*68, y=v=>194-v*68;
+    svgEl('rect',{x:49,y:24,width:340,height:340,fill:'none',stroke:'var(--line)'},svg);
+    for(const t of [-2,-1,0,1,2]) { svgEl('line',{x1:x(t),x2:x(t),y1:24,y2:364,class:'grid'},svg);svgEl('line',{x1:49,x2:389,y1:y(t),y2:y(t),class:'grid'},svg);label(svg,x(t),385,String(t),{'text-anchor':'middle'});label(svg,43,y(t)+4,String(t),{'text-anchor':'end'}); }
+    const g=svgEl('g',{'clip-path':'url(#contour-clip)'},svg);
+    // Each ellipse uses an absolute function height c: L*x*x + m*y*y = 2*c.
+    // Keeping c fixed makes changes in either curvature visible, including common scaling.
+    for(const c of [.02,.05,.1,.2,.4,.8,1.6,3.2,6.4,12.8,25.6])
+      svgEl('ellipse',{cx:x(0),cy:y(0),rx:Math.sqrt(2*c/L)*68,ry:Math.sqrt(2*c/m)*68,class:'contour'},g);
+    const r=m/L;
+    const points=Array.from({length:n+1},(_,k)=> k===0 ? [2,2] : [0,2*Math.pow(1-r,k)]);
+    svgEl('polyline',{points:points.map(p=>`${x(p[0])},${y(p[1])}`).join(' '),class:'path'},g);
+    svgEl('circle',{cx:x(2),cy:y(2),r:5,fill:'var(--orange)'},g);label(svg,x(2)-9,y(2)-11,'Start',{'text-anchor':'end'});
+    svgEl('circle',{cx:x(0),cy:y(0),r:4,fill:'var(--text)'},g);label(svg,x(0)+12,y(0)+5,'Minimum');
+    const p=points[n];svgEl('circle',{cx:x(p[0]),cy:y(p[1]),r:7,class:'dot'},g);
+    label(svg,219,410,'x — steep direction',{'text-anchor':'middle'});
+    label(svg,20,194,'y — flat direction',{'text-anchor':'middle',transform:'rotate(-90 20 194)'});
+  }
+  function drawSlices(L,m) {
+    const svg=$('slices');svg.replaceChildren();
+    const x=u=>62+u*156, y=v=>348-v*14.4;
+    svgEl('rect',{x:62,y:60,width:312,height:288,fill:'none',stroke:'var(--line)'},svg);
+    for(const height of [0,5,10,15,20]) {
+      svgEl('line',{x1:62,x2:374,y1:y(height),y2:y(height),class:'grid'},svg);
+      label(svg,53,y(height)+4,String(height),{'text-anchor':'end'});
+    }
+    for(const u of [0,.5,1,1.5,2]) {
+      svgEl('line',{x1:x(u),x2:x(u),y1:60,y2:348,class:'grid'},svg);
+      label(svg,x(u),370,String(u),{'text-anchor':'middle'});
+    }
+    const pathFor=curvature=>Array.from({length:81},(_,i)=>{
+      const u=i/40;return `${i===0?'M':'L'} ${x(u).toFixed(2)} ${y(.5*curvature*u*u).toFixed(2)}`;
+    }).join(' ');
+    svgEl('path',{d:pathFor(L),class:'curve'},svg);
+    svgEl('path',{d:pathFor(m),class:'curve-flat'},svg);
+    label(svg,218,408,'Distance from center',{'text-anchor':'middle'});
+    label(svg,20,205,'Function height',{'text-anchor':'middle',transform:'rotate(-90 20 205)'});
+  }
+  function drawProgress(r,n) {
+    const svg=$('progress');svg.replaceChildren();
+    const x=k=>70+7.3*k, y=q=>205-160*q;
+    svgEl('rect',{x:70,y:45,width:730,height:160,fill:'none',stroke:'var(--line)'},svg);
+    for(const q of [0,.25,.5,.75,1]) {svgEl('line',{x1:70,x2:800,y1:y(q),y2:y(q),class:'grid'},svg);label(svg,60,y(q)+4,`${Math.round(100*q)}%`,{'text-anchor':'end'});}
+    for(const k of [0,25,50,75,100]) {svgEl('line',{x1:x(k),x2:x(k),y1:45,y2:205,class:'grid'},svg);label(svg,x(k),225,String(k),{'text-anchor':'middle'});}
+    const vals=Array.from({length:101},(_,k)=>[x(k),y(Math.pow(1-r,k))]);
+    svgEl('polyline',{points:vals.map(p=>p.join(',')).join(' '),class:'curve'},svg);
+    svgEl('line',{x1:x(n),x2:x(n),y1:45,y2:205,stroke:'var(--orange)','stroke-width':1.5,'stroke-dasharray':'5 5'},svg);
+    svgEl('circle',{cx:x(n),cy:y(Math.pow(1-r,n)),r:7,class:'dot'},svg);
+    label(svg,435,253,'Gradient steps',{'text-anchor':'middle'});
+  }
+  function update() {
+    const L=Number(Linput.value); minput.max=String(Math.log10(L));
+    if(Number(minput.value)>Math.log10(L)) minput.value=String(Math.log10(L));
+    const m=Math.pow(10,Number(minput.value)), n=Number(stepsInput.value), r=m/L, remaining=Math.pow(1-r,n);
+    $('L-value').value=fmt(L);$('m-value').value=pretty(m);$('steps-value').value=n;
+    $('ratio').textContent=pretty(r);$('kappa').textContent=fmt(1/r,1);$('eta').textContent=fmt(1/L,3);
+    document.querySelectorAll('[data-L]').forEach(b=>b.setAttribute('aria-pressed',Math.abs(L-Number(b.dataset.L))<.026 && Math.abs(m-Number(b.dataset.m))/Number(b.dataset.m)<.005?'true':'false'));
+    const moved=100*r, left=100*remaining;
+    $('flat-fill').style.width=`${moved}%`;
+    $('flat-percent').textContent=`${moved>=1?fmt(moved,1):pretty(moved)}%`;
+    $('takeaway').innerHTML=`<strong>After ${n} step${n===1?'':'s'}, ${fmt(left,1)}% of the flat-direction distance remains.</strong> The x direction is cleared by the first step, but each step removes only ${moved>=1?fmt(moved,1):pretty(moved)}% of the distance in y. ${r>.9995?'Both directions have the same curvature, so they converge together.':'The smaller m/L is, the slower this final part becomes.'}`;
+    drawContours(L,m,n);drawSlices(L,m);drawProgress(r,n);
+  }
+  document.querySelectorAll('[data-L]').forEach(b=>b.addEventListener('click',()=>{
+    Linput.value=b.dataset.L;minput.max=String(Math.log10(Number(b.dataset.L)));
+    minput.value=String(Math.log10(Number(b.dataset.m)));update();
+  }));
+  Linput.addEventListener('input',update);minput.addEventListener('input',update);stepsInput.addEventListener('input',update);
+  update();
+})();
+</script>
+</body>
+</html>
